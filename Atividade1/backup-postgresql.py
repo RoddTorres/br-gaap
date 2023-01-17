@@ -14,6 +14,7 @@ db_host = input("Digite o host: ")
 conn = psycopg2.connect(dbname=db_name, user=db_user, password=db_pwd, port=db_port, host=db_host) 
 #Opção 2: ler dados acima através de um arquivo externo para proteção dos dados.
 
+#Consulta SQL que traz uma tabela do banco de dados 
 results_from_query = pd.read_sql("SELECT * FROM categories", conn)
 print(results_from_query)
 

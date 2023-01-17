@@ -16,7 +16,7 @@ try:
     #Criar conexão com o banco de dados
     conn = psycopg2.connect(dbname=db_name, user=db_user, password=db_pwd, port=db_port, host=db_host)
 
-    #Consulta SQL para uma tabela - 
+    #Consulta SQL que traz uma tabela do banco de dados 
     table_name = input("Digite o nome da tabela a ser consultada: ") #Vide arquivo northwind.sql. No exemplo a tabela foi categories
     results_from_query = pd.read_sql(f"SELECT * FROM {table_name}", conn)
     print(results_from_query)
