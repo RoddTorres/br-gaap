@@ -1,53 +1,54 @@
-import pandas as pd
-import psycopg2
-import json
-import win32com.client as win32
+import os
+import subprocess
+import smtplib
+from datetime import datetime
+from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email import encoders
+from dotenv import load_dotenv
 
-#Busca dos parâmetros de conexão ao banco de dados PostgreSQL
-db_name = input("Digite o banco de dados desejado: ")
-db_user = input("Digite o nome de usuário do banco de dados: ")
-db_pwd = input("Digite a senha do banco de dados: ")
-db_port = input("Digite a porta do banco de dados: ")
-db_host = input("Digite o host: ")
+# Carregando informações do arquivo .env
+load_dotenv()
 
-#Criar conexão com o banco de dados
-conn = psycopg2.connect(dbname=db_name, user=db_user, password=db_pwd, port=db_port, host=db_host) 
-#Opção 2: ler dados acima através de um arquivo externo para proteção dos dados.
+# Lendo as informações de conexão do banco de dados do arquivo .env
+dbname = os.getenv('DB_NAME')
+dbuser = os.getenv('DB_USER')
+dbpassword = os.getenv('DB_PWD')
 
-#Consulta SQL que traz uma tabela do banco de dados 
-results_from_query = pd.read_sql("SELECT * FROM categories", conn)
-print(results_from_query)
+# Gerar nome do arquivo de backup com o nome do banco de dados e a data de criação
+now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+backup_file = f'{dbname}_{now}.sql'
 
-# table_names_query = pd.read_sql("SELECT tablename FROM pg_tables WHERE schemaname = 'public'", conn)
-# print(table_names_query)
+# Criando pasta de backup
+backup_folder = 'Backup'
+if not os.path.exists(backup_folder):
+    os.mkdir(backup_folder)
 
-#Conversão do Dataframe para Json
-results_json_file = results_from_query.to_json()
+# Comando para fazer backup do banco de dados
+subprocess.call(['pg_dump', '-U', dbuser, '-Fp', '-b', '-v', '-f', os.path.join(backup_folder, backup_file), dbname])
 
-#Criar arquivo .json
-with open('./Atividade1/backup_data.json', 'w') as fh:
-    fh.write(results_json_file)
+print(f'Backup do banco de dados {dbname} criado com sucesso em {os.path.join(backup_folder, backup_file)}!')
 
-conn.close()
+# Enviando o arquivo de backup por email
+from_email = os.getenv('EMAIL_USER')
+to_email = os.getenv('EMAIL_DESTINATION')
+password = os.getenv('EMAIL_PWD')
 
-#Envio de um email com anexo
-outlook = win32.Dispatch('outlook.application')
+msg = MIMEMultipart()
+msg['From'] = from_email
+msg['To'] = to_email
+msg['Subject'] = "Banco de dados backup"
 
-email = outlook.CreateItem(0)
+part = MIMEBase('application', "octet-stream")
+part.set_payload(open(os.path.join(backup_folder, backup_file), "rb").read())
+encoders.encode_base64(part)
+part.add_header('Content-Disposition', 'attachment', filename=os.path.basename(backup_file))
+msg.attach(part)
 
-email.To = "rtsouza87@gmail.com"
-email.Subject = "Backup BD"
-email.HTMLBody = """
-<p>Bom dia<p>
+smtpObj = smtplib.SMTP('smtp.gmail.com', 587)
+smtpObj.starttls()
+smtpObj.login(from_email, password)
+smtpObj.sendmail(from_email, to_email, msg.as_string())
+smtpObj.quit()
 
-<p>Segue backup em anexo<p>
-
-<p>Atenciosamente<p>
-"""
-anexo = "./Atividade1/backup_data.json'"
-email.Attachments.Add(anexo)
-
-email.Send()
-print("Email enviado")
-
-
+print(f'Backup do banco de dados enviado para o email {to_email}')
