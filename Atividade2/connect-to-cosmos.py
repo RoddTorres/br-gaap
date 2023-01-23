@@ -1,51 +1,45 @@
 import os
 import json
-import dotenv
-import pandas as pd
-import psycopg2
+from sqlalchemy import create_engine
 from azure.cosmos import CosmosClient, PartitionKey
 
-#Busca dos parâmetros de conexão ao banco de dados PostgreSQL
-dotenv.load_dotenv(dotenv.find_dotenv())
-DB_NAME = os.getenv("DB_NAME")
-DB_USER = os.getenv("DB_USER")
-DB_PWD = os.getenv("DB_PWD")
-DB_PORT = os.getenv("DB_PORT")
-DB_HOST = os.getenv("DB_HOST")
-
-conn = psycopg2.connect(dbname=DB_NAME, user=DB_USER, password=DB_PWD, port=DB_PORT, host=DB_HOST)
-
-results_from_query = pd.read_sql("SELECT * FROM categories", conn)
-print(results_from_query)
-results_json_file = results_from_query.to_json()
-print(results_json_file)
-
-with open('./Atividade2/backup_data.json', 'w') as fh:
-    fh.write(results_json_file)
-
-result = json.loads(results_json_file)
-    
-conn.close()
-
-dotenv.load_dotenv(dotenv.find_dotenv())
+#Busca dos parâmetros de conexão ao banco de dados PostgreSQL e CosmosDB em arquivo .env
+dbname = os.getenv("DB_NAME")
+dbuser = os.getenv("DB_USER")
+dbpassword = os.getenv("DB_PWD")
+dbhost = os.getenv("DB_HOST")
+dbport = os.getenv("DB_PORT")
 endpoint = os.getenv("COSMOS_ENDPOINT")
 cosmos_key = os.getenv("COSMOS_KEY")
 
+#Criar a engine PostgreSQL
+pg_engine = create_engine(f'postgresql://{dbuser}:{dbpassword}@{dbhost}:{dbport}/{dbname}')
+
+#Busca dos dados na tabela Categories
+pg_table = pg_engine.execute("SELECT * FROM categories").fetchall()
+
+#Criar o objeto CosmosClient
 client = CosmosClient(url=endpoint, credential=cosmos_key)
 
+#Criar o banco de dados "sipef" e container "financeiro" no CosmosDB
 database = client.create_database_if_not_exists(id="sipef")
-
-
-partitionKeyPath = PartitionKey(path="/categoryId")
-
+key_path = PartitionKey(path="/logs")
 container = database.create_container_if_not_exists(
-    id="products", partition_key=partitionKeyPath
+    id="financeiro", partition_key=key_path, offer_throughput=400
 )
 
-container.create_item(results_json_file)
+#Mapear os campos obtidos pelo PostgreSQL, transformando-os em dicionário
+def map_fields(row):
+    mapped_fields = {}
+    mapped_fields["category_name"] = row[1]
+    mapped_fields["description"] = row[2]
+    mapped_fields["picture"] = row[3]
+    return mapped_fields
 
-# existingItem = container.read_item(
-#     item="70b63682-b93a-4c77-aad2-65501347265f",
-#     partition_key="61dba35b-4f02-45c5-b648-c6badc0cbd79",
-# )
-
+#Iterar pelas linhas da tabela PostgreSQL e adiocioná-las no CosmosDB
+for row in pg_table:
+    mapped_fields = map_fields(row)
+    mapped_fields["id"] = json.dumps(row[0])
+    container.create_item(mapped_fields)
+    
+print("Tabela adicionada no CosmosDB")

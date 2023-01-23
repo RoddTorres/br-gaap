@@ -19,17 +19,17 @@ dbpassword = os.getenv('DB_PWD')
 now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 backup_file = f'{dbname}_{now}.sql'
 
-# Criando pasta de backup
+# Criar pasta de backup
 backup_folder = 'Backup'
 if not os.path.exists(backup_folder):
     os.mkdir(backup_folder)
 
-# Comando para fazer backup do banco de dados
+# Backup do banco de dados
 subprocess.call(['pg_dump', '-U', dbuser, '-Fp', '-b', '-v', '-f', os.path.join(backup_folder, backup_file), dbname])
 
 print(f'Backup do banco de dados {dbname} criado com sucesso em {os.path.join(backup_folder, backup_file)}!')
 
-# Enviando o arquivo de backup por email
+# Enviar o arquivo de backup por email
 from_email = os.getenv('EMAIL_USER')
 to_email = os.getenv('EMAIL_DESTINATION')
 password = os.getenv('EMAIL_PWD')
