@@ -1,3 +1,5 @@
+# Teste técnico para o exame seletivo da BR Gaap
+
 # Instalações necessárias para rodar as aplicações.
 * `pip install pandas`
 * `pip install python-dotenv`
